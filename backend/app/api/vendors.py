@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from app.services.cosmos import CosmosService
 from app.services.ingestion import ingest_from_excel
@@ -12,9 +13,15 @@ async def list_vendors(
     eligible_only: bool = Query(False),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    template_id: Optional[str] = Query(None),
 ):
     db = CosmosService.get()
-    vendors = await db.list_vendors(eligible_only=eligible_only, limit=limit, offset=offset)
+    vendors = await db.list_vendors(
+        eligible_only=eligible_only,
+        limit=limit,
+        offset=offset,
+        template_id=template_id,
+    )
     counts = await db.count_vendors()
     return VendorListResponse(
         vendors=vendors,

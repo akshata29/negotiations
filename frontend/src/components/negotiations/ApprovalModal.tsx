@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, Edit3, X, MessageSquare, AlertTriangle } from 'lucide-react'
-import { approveEmail, submitVendorReply, escalateNegotiation } from '../../services/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle, Edit3, X, MessageSquare, AlertTriangle, Loader2 } from 'lucide-react'
+import { approveEmail, submitVendorReply, escalateNegotiation, getNegotiation } from '../../services/api'
 import { StatusBadge } from '../common/StatusBadge'
 import type { Negotiation } from '../../types'
 
@@ -18,6 +18,12 @@ export function ApprovalModal({ negotiation, onClose }: Props) {
   const [escalateNotes, setEscalateNotes] = useState('')
   const [approver] = useState('James Caldwell')
   const [isEditing, setIsEditing] = useState(false)
+
+  // Fetch the full negotiation (includes emails array — not present in list response)
+  const { data: fullNeg, isLoading: negLoading } = useQuery({
+    queryKey: ['negotiation', negotiation.id],
+    queryFn: () => getNegotiation(negotiation.id),
+  })
 
   const approveMut = useMutation({
     mutationFn: () =>
@@ -46,8 +52,8 @@ export function ApprovalModal({ negotiation, onClose }: Props) {
     },
   })
 
-  // Find pending email from emails list
-  const pendingEmail = negotiation.emails?.find(e => e.id === negotiation.pending_approval_email_id)
+  // Find pending email from the fully-fetched negotiation (list response lacks emails array)
+  const pendingEmail = fullNeg?.emails?.find(e => e.id === negotiation.pending_approval_email_id)
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
@@ -91,7 +97,12 @@ export function ApprovalModal({ negotiation, onClose }: Props) {
           {/* Approve tab */}
           {tab === 'approve' && (
             <div className="space-y-4">
-              {pendingEmail ? (
+              {negLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-gray-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading email…
+                </div>
+              ) : pendingEmail ? (
                 <>
                   <div className="bg-gray-800 rounded-lg p-4 space-y-2">
                     <p className="text-xs text-gray-400">Subject</p>

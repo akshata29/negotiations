@@ -1,13 +1,13 @@
-import { Bell, Wifi, WifiOff } from 'lucide-react'
+import { Wifi, WifiOff } from 'lucide-react'
+import { NotificationBell } from './NotificationBell'
 
 interface Props {
   title: string
   subtitle?: string
   wsConnected: boolean
-  pendingApprovals?: number
 }
 
-export function Header({ title, subtitle, wsConnected, pendingApprovals = 0 }: Props) {
+export function Header({ title, subtitle, wsConnected }: Props) {
   return (
     <header className="h-14 flex-shrink-0 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6">
       <div>
@@ -24,15 +24,8 @@ export function Header({ title, subtitle, wsConnected, pendingApprovals = 0 }: P
           )}
         </div>
 
-        {/* Approval badge */}
-        {pendingApprovals > 0 && (
-          <div className="relative">
-            <Bell className="w-5 h-5 text-amber-400" />
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 rounded-full text-xs text-white flex items-center justify-center">
-              {pendingApprovals}
-            </span>
-          </div>
-        )}
+        {/* Notification bell — live pending-approval dropdown */}
+        <NotificationBell />
 
         {/* User */}
         <div className="flex items-center gap-2">

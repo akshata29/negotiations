@@ -105,6 +105,20 @@ export interface ABTestStat {
   ucb1_score: number
 }
 
+export interface ABGroupMetric {
+  group: string
+  total: number
+  agreed: number
+  rejected: number
+  escalated: number
+  in_progress: number
+  close_rate: number
+  rejection_rate: number
+  first_round_rate: number
+  avg_rounds: number
+  avg_improvement_score: number
+}
+
 export interface DashboardStats {
   vendor_counts: {
     total: number
@@ -116,9 +130,73 @@ export interface DashboardStats {
   best_ab_group: ABGroup | null
   pending_approvals: number
   recent_negotiations: Negotiation[]
+  analytics: {
+    outcomes: { agreed: number; rejected: number; escalated: number }
+    pipeline: { contact: number; proposal: number; counter: number }
+    efficiency: { avg_rounds: number; avg_improvement_score: number }
+  }
+}
+
+// ── Rule Templates ────────────────────────────────────────────────────────────
+
+export type RuleOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_in'
+export type RuleConjunction = 'AND' | 'OR'
+export type RuleFieldType = 'string' | 'number' | 'boolean'
+
+export interface RuleCondition {
+  field: string
+  operator: RuleOperator
+  value: string | number | boolean | string[]
+}
+
+export interface RuleTemplate {
+  id: string
+  name: string
+  description: string | null
+  conditions: RuleCondition[]
+  conjunction: RuleConjunction
+  created_at: string
+  updated_at: string
+}
+
+export interface FieldCatalogEntry {
+  field: string
+  type: RuleFieldType
+  operators: RuleOperator[]
 }
 
 export interface WSEvent {
   event: string
   data: Record<string, unknown>
+}
+
+// ── Agent Settings ───────────────────────────────────────────────────────────────
+
+export interface AgentSettings {
+  id: string
+  model_deployment_name: string
+  email_system_prompt: string
+  analyzer_system_prompt: string
+  personality: string
+  updated_at: string
+}
+
+export interface PersonalityPreset {
+  id: string
+  label: string
+  description: string
+  generated_prompt: string
+}
+
+export interface ModelOption {
+  id: string
+  label: string
+}
+
+export interface PersonaInfo {
+  name: string
+  title: string
+  company: string
+  phone: string
+  email: string
 }

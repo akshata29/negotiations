@@ -1,16 +1,20 @@
 import axios from 'axios'
 import type {
-  Vendor, Negotiation, ABTestStat, DashboardStats, ABGroup
+  Vendor, Negotiation, ABTestStat, DashboardStats, ABGroup,
+  RuleTemplate, RuleCondition, RuleConjunction, FieldCatalogEntry,
+  AgentSettings, PersonalityPreset, ModelOption, PersonaInfo,
+  ABGroupMetric,
 } from '../types'
 
 const api = axios.create({ baseURL: '/api' })
 
-// ── Vendors ──────────────────────────────────────────────────────────────
+// ── Vendors ──────────────────────────────────────────────────────────────────
 
 export async function listVendors(params?: {
   eligible_only?: boolean
   limit?: number
   offset?: number
+  template_id?: string | null
 }) {
   const res = await api.get<{
     vendors: Vendor[]
@@ -40,6 +44,33 @@ export async function generateSyntheticVendors(count: number) {
 
 export async function getVendor(vendorId: number) {
   const res = await api.get<Vendor>(`/vendors/${vendorId}`)
+  return res.data
+}
+
+// ── Rule Templates ───────────────────────────────────────────────────────────
+
+export async function listRuleTemplates() {
+  const res = await api.get<{ templates: RuleTemplate[]; total: number }>('/rule-templates')
+  return res.data
+}
+
+export async function createRuleTemplate(data: {
+  name: string
+  description?: string
+  conditions: RuleCondition[]
+  conjunction: RuleConjunction
+}) {
+  const res = await api.post<RuleTemplate>('/rule-templates', data)
+  return res.data
+}
+
+export async function deleteRuleTemplate(templateId: string) {
+  const res = await api.delete<{ status: string }>(`/rule-templates/${templateId}`)
+  return res.data
+}
+
+export async function getFieldCatalog() {
+  const res = await api.get<{ fields: FieldCatalogEntry[] }>('/rule-templates/field-catalog')
   return res.data
 }
 
@@ -132,9 +163,60 @@ export async function getABStats() {
   return res.data
 }
 
+export async function getABGroupMetrics() {
+  const res = await api.get<{ metrics: ABGroupMetric[] }>('/ab-testing/group-metrics')
+  return res.data
+}
+
+export async function simulateABSelections(n = 20) {
+  const res = await api.get<{
+    n: number
+    selections: string[]
+    distribution: Record<string, { count: number; pct: number }>
+  }>('/ab-testing/simulate', { params: { n } })
+  return res.data
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────
 
 export async function getDashboardStats() {
   const res = await api.get<DashboardStats>('/dashboard/stats')
+  return res.data
+}
+
+// ── Settings ────────────────────────────────────────────────────────────
+
+export async function getAgentSettings() {
+  const res = await api.get<AgentSettings>('/settings')
+  return res.data
+}
+
+export async function updateAgentSettings(data: Partial<AgentSettings>) {
+  const res = await api.put<AgentSettings>('/settings', data)
+  return res.data
+}
+
+export async function applyAgentSettings() {
+  const res = await api.post<{ status: string; model: string; agents: { agent: string; version: string }[] }>('/settings/apply')
+  return res.data
+}
+
+export async function getPersonalityPresets() {
+  const res = await api.get<{ presets: PersonalityPreset[] }>('/settings/personality-presets')
+  return res.data
+}
+
+export async function getAvailableModels() {
+  const res = await api.get<{ models: ModelOption[]; current: string }>('/settings/available-models')
+  return res.data
+}
+
+export async function getDefaultSettings() {
+  const res = await api.get<AgentSettings>('/settings/defaults')
+  return res.data
+}
+
+export async function getPersonaInfo() {
+  const res = await api.get<PersonaInfo>('/settings/persona')
   return res.data
 }

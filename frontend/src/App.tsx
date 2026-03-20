@@ -7,6 +7,8 @@ import { Vendors } from './pages/Vendors'
 import { Negotiations } from './pages/Negotiations'
 import { NegotiationDetail } from './pages/NegotiationDetail'
 import { ABTesting } from './pages/ABTesting'
+import { Architecture } from './pages/Architecture'
+import { Settings } from './pages/Settings'
 import { useLocation } from 'react-router-dom'
 
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
@@ -14,12 +16,13 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/vendors': { title: 'Vendors', subtitle: 'Manage and filter vendor list' },
   '/negotiations': { title: 'Negotiations', subtitle: 'Track active negotiations' },
   '/ab-testing': { title: 'A/B Testing & RL', subtitle: 'UCB1 multi-armed bandit strategy selection' },
+  '/architecture': { title: 'Architecture', subtitle: 'End-to-end system design & component details' },
+  '/settings': { title: 'Settings', subtitle: 'Model, system prompts & agent personality' },
 }
 
 export default function App() {
   const location = useLocation()
   const [wsConnected, setWsConnected] = useState(false)
-  const [pendingApprovals, setPendingApprovals] = useState(0)
 
   const path = location.pathname
   const isDetailPage = path.startsWith('/negotiations/') && path.length > '/negotiations/'.length
@@ -35,15 +38,16 @@ export default function App() {
           title={meta.title}
           subtitle={meta.subtitle}
           wsConnected={wsConnected}
-          pendingApprovals={pendingApprovals}
         />
         <main className="flex-1 overflow-y-auto p-6">
           <Routes>
-            <Route path="/" element={<Dashboard setWsConnected={setWsConnected} setPending={setPendingApprovals} />} />
+            <Route path="/" element={<Dashboard setWsConnected={setWsConnected} setPending={() => {}} />} />
             <Route path="/vendors" element={<Vendors />} />
             <Route path="/negotiations" element={<Negotiations />} />
             <Route path="/negotiations/:id" element={<NegotiationDetail />} />
             <Route path="/ab-testing" element={<ABTesting />} />
+            <Route path="/architecture" element={<Architecture />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

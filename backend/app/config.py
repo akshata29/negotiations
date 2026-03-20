@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     NEGOTIATIONS_CONTAINER: str = "negotiations"
     NEGOTIATIONS_EMAILS_CONTAINER: str = "email_threads"
     NEGOTIATIONS_RL_CONTAINER: str = "rl_state"
+    NEGOTIATIONS_RULE_TEMPLATES_CONTAINER: str = "rule_templates"
+    NEGOTIATIONS_SETTINGS_CONTAINER: str = "agent_settings"
 
     # Merchandising Leader Persona
     MERCH_LEADER_NAME: str = "James Caldwell"

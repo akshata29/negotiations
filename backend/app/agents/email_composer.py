@@ -16,6 +16,16 @@ from app.models.negotiation import ABGroup, STRATEGY_DESCRIPTIONS
 _EMAIL_AGENT_NAME = "negotiation-email-composer"
 _email_agent_version: str = "1"  # set at startup by main.py after bootstrap
 
+# Mandatory output rules appended to every email-composer system prompt.
+# These are NOT user-editable — they are always appended by main.py / apply endpoint.
+EMAIL_OUTPUT_RULES = (
+    "OUTPUT RULES (mandatory):\n"
+    "- Your entire response MUST be a single raw JSON object.\n"
+    "- Do NOT wrap output in markdown code fences (no ```json or ```).\n"
+    "- Do NOT include any prose, explanation, or text outside the JSON object.\n"
+    "- The very first character of your response must be '{' and the last must be '}'."
+)
+
 
 def set_agent_version(version: str) -> None:
     """Called by main.py lifespan after create_version to pin the exact bootstrapped version."""

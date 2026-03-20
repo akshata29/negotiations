@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Play, Filter, RefreshCw, Upload, Wand2, X } from 'lucide-react'
-import { listVendors, startNegotiation, importVendors, generateSyntheticVendors } from '../../services/api'
+import { Search, Play, Filter, RefreshCw, Upload, Wand2, X, BookOpen, ChevronDown } from 'lucide-react'
+import { listVendors, startNegotiation, importVendors, generateSyntheticVendors, listRuleTemplates } from '../../services/api'
 import { StatusBadge } from '../common/StatusBadge'
-import type { Vendor } from '../../types'
+import { RuleBuilderModal } from './RuleBuilderModal'
+import type { Vendor, RuleTemplate } from '../../types'
 
 interface Props {
   onViewNegotiation?: (id: string) => void
@@ -15,12 +16,25 @@ export function VendorTable({ onViewNegotiation }: Props) {
   const [eligibleOnly, setEligibleOnly] = useState(false)
   const [page, setPage] = useState(0)
   const [showGenModal, setShowGenModal] = useState(false)
+  const [showRuleBuilder, setShowRuleBuilder] = useState(false)
+  const [activeTemplate, setActiveTemplate] = useState<RuleTemplate | null>(null)
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
   const [genCount, setGenCount] = useState(100)
   const PAGE_SIZE = 50
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['vendors', eligibleOnly, page],
-    queryFn: () => listVendors({ eligible_only: eligibleOnly, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    queryKey: ['vendors', eligibleOnly, page, activeTemplate?.id ?? null],
+    queryFn: () => listVendors({
+      eligible_only: eligibleOnly && !activeTemplate,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+      template_id: activeTemplate?.id ?? null,
+    }),
+  })
+
+  const { data: templatesData } = useQuery({
+    queryKey: ['rule-templates'],
+    queryFn: listRuleTemplates,
   })
 
   const importMut = useMutation({
@@ -60,16 +74,64 @@ export function VendorTable({ onViewNegotiation }: Props) {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+        <label className={`flex items-center gap-2 text-sm cursor-pointer transition-colors ${activeTemplate ? 'text-gray-600 opacity-40 pointer-events-none' : 'text-gray-300'}`}>
           <Filter className="w-4 h-4 text-gray-400" />
           <input
             type="checkbox"
             className="accent-blue-500"
             checked={eligibleOnly}
+            disabled={!!activeTemplate}
             onChange={e => { setEligibleOnly(e.target.checked); setPage(0) }}
           />
           Eligible only
         </label>
+
+        {/* Template Preset Selector */}
+        <div className="relative">
+          <button
+            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+              activeTemplate
+                ? 'bg-blue-900/40 border-blue-600 text-blue-300'
+                : 'btn-secondary border-gray-700 text-gray-300'
+            }`}
+            onClick={() => setShowTemplateDropdown(v => !v)}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            {activeTemplate ? activeTemplate.name : 'Presets'}
+            {activeTemplate
+              ? <X className="w-3 h-3 ml-1 hover:text-red-400" onClick={e => { e.stopPropagation(); setActiveTemplate(null); setPage(0) }} />
+              : <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            }
+          </button>
+
+          {showTemplateDropdown && (
+            <div className="absolute left-0 top-full mt-1 z-30 bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-64 py-1">
+              {(templatesData?.templates ?? []).length === 0 ? (
+                <p className="py-3 px-4 text-xs text-gray-500">No presets saved yet.</p>
+              ) : (
+                (templatesData?.templates ?? []).map(t => (
+                  <button
+                    key={t.id}
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-800 transition-colors"
+                    onClick={() => { setActiveTemplate(t); setPage(0); setShowTemplateDropdown(false) }}
+                  >
+                    <span className={`font-medium ${activeTemplate?.id === t.id ? 'text-blue-300' : 'text-white'}`}>{t.name}</span>
+                    {t.description && <span className="block text-xs text-gray-500 truncate">{t.description}</span>}
+                  </button>
+                ))
+              )}
+              <div className="border-t border-gray-800 mt-1 pt-1">
+                <button
+                  className="w-full text-left px-4 py-2 text-xs text-blue-400 hover:text-blue-300 hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+                  onClick={() => { setShowTemplateDropdown(false); setShowRuleBuilder(true) }}
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Manage presets…
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <button className="btn-secondary flex items-center gap-1.5 text-sm" onClick={() => refetch()}>
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
@@ -88,6 +150,19 @@ export function VendorTable({ onViewNegotiation }: Props) {
           <Wand2 className="w-3.5 h-3.5" /> Generate Data
         </button>
       </div>
+
+      {/* Active template chip */}
+      {activeTemplate && (
+        <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/20 border border-blue-800/50 rounded-lg px-3 py-2">
+          <BookOpen className="w-3.5 h-3.5 shrink-0" />
+          <span className="font-medium">{activeTemplate.name}</span>
+          <span className="text-blue-500">·</span>
+          <span className="text-blue-400">{activeTemplate.conditions.length} condition{activeTemplate.conditions.length !== 1 ? 's' : ''} ({activeTemplate.conjunction})</span>
+          <button className="ml-auto text-blue-500 hover:text-white transition-colors" onClick={() => setActiveTemplate(null)}>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {importMut.isSuccess && (
         <div className="text-xs text-green-400 bg-green-900/20 rounded-lg px-3 py-2">
@@ -255,6 +330,19 @@ export function VendorTable({ onViewNegotiation }: Props) {
           <button className="btn-secondary text-xs" onClick={() => setPage(p => p + 1)}>Next →</button>
         </div>
       </div>
+
+      {/* Rule Builder Modal */}
+      {showRuleBuilder && (
+        <RuleBuilderModal
+          onClose={() => setShowRuleBuilder(false)}
+          onApply={(t) => { setActiveTemplate(t); setPage(0) }}
+        />
+      )}
+
+      {/* Click-outside overlay for template dropdown */}
+      {showTemplateDropdown && (
+        <div className="fixed inset-0 z-20" onClick={() => setShowTemplateDropdown(false)} />
+      )}
     </div>
   )
 }

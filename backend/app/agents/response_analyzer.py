@@ -24,7 +24,7 @@ def set_agent_version(version: str) -> None:
     _analyzer_agent_version = str(version)
     log.info("[response_analyzer] using agent '%s' version %s", _ANALYZER_AGENT_NAME, _analyzer_agent_version)
 
-ANALYZER_SYSTEM = """You are a professional vendor negotiation analyst for McLane Company's procurement team.
+ANALYZER_SYSTEM = """You are a professional vendor negotiation analyst for ABC Company's procurement team.
 Your job is to analyze incoming vendor email responses to payment terms negotiation and extract:
 1. The vendor's intent / sentiment
 2. Whether they confirmed they are the right contact (for contact verification emails)

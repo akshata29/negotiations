@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     # Merchandising Leader Persona
     MERCH_LEADER_NAME: str = "James Caldwell"
     MERCH_LEADER_TITLE: str = "VP of Vendor Relations & Merchandising"
-    MERCH_LEADER_EMAIL: str = "james.caldwell@mclane.com"
-    MERCH_LEADER_COMPANY: str = "McLane Company"
+    MERCH_LEADER_EMAIL: str = "james.caldwell@abc.com"
+    MERCH_LEADER_COMPANY: str = "Company"
     MERCH_LEADER_PHONE: str = "(254) 771-7500"
 
     # App

@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo  McLane Autonomous Negotiations — Full Stack
+echo  Autonomous Negotiations — Full Stack
 echo ============================================================
 echo Starting Backend (port 8000) and Frontend (port 5173)...
 echo.

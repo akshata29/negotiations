@@ -32,7 +32,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             "James,\n\nThank you for the detailed proposal. We have reviewed the terms and "
             "we are happy to accept the terms as proposed. "
             "Please send the formal documentation and we will sign off promptly. "
-            "We appreciate McLane's partnership and look forward to a long-term arrangement.\n\nBest regards"
+            "We appreciate ABC's partnership and look forward to a long-term arrangement.\n\nBest regards"
         ),
     },
     "friendly_counter": {
@@ -42,7 +42,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "description": "Vendor confirms, counter-proposes modest terms, then accepts your counter-response.",
         "contact_reply": (
             "Hello James,\n\nConfirmed — I am the appropriate contact for payment terms discussions. "
-            "Happy to work through this with McLane.\n\nLooking forward to your proposal."
+            "Happy to work through this with ABC.\n\nLooking forward to your proposal."
         ),
         "proposal_reply": (
             "Hi James,\n\nThank you for reaching out. We appreciate the proposal. "
@@ -97,7 +97,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             "we are unable to modify our current payment terms at this time. "
             "Our terms are fixed at the corporate level and are non-negotiable. "
             "We must respectfully decline your proposal. "
-            "We value our relationship with McLane and hope to continue our business under existing terms.\n\nRegards"
+            "We value our relationship with ABC and hope to continue our business under existing terms.\n\nRegards"
         ),
     },
     "wrong_contact": {

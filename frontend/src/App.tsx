@@ -25,7 +25,7 @@ export default function App() {
   const isDetailPage = path.startsWith('/negotiations/') && path.length > '/negotiations/'.length
   const meta = isDetailPage
     ? { title: 'Negotiation Detail', subtitle: 'Email thread & workflow' }
-    : PAGE_TITLES[path] ?? { title: 'McLane NegoAgent' }
+    : PAGE_TITLES[path] ?? { title: 'ABC NegoAgent' }
 
   return (
     <div className="flex h-screen overflow-hidden">

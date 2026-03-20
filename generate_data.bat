@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo  McLane Autonomous Negotiations — Generate Synthetic Data
+echo Autonomous Negotiations — Generate Synthetic Data
 echo ============================================================
 cd /d "%~dp0\backend"
 

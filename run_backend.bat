@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo  McLane Autonomous Negotiations — Backend API
+echo  Autonomous Negotiations — Backend API
 echo ============================================================
 cd /d "%~dp0\backend"
 

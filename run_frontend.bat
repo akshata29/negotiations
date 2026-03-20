@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo  McLane Autonomous Negotiations — Frontend UI
+echo  Autonomous Negotiations — Frontend UI
 echo ============================================================
 cd /d "%~dp0\frontend"
 

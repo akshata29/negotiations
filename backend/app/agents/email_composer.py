@@ -67,7 +67,7 @@ Guidelines:
 - Reference the current terms and explain the business context (working capital optimization).
 - Present the proposed terms clearly and professionally.
 - Keep a collaborative, win-win tone.
-- Mention that McLane values the long-term partnership.
+- Mention that ABC values the long-term partnership.
 - Keep under 300 words.
 - Do not use aggressive language.
 

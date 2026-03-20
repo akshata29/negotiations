@@ -84,3 +84,4 @@ data/
 *.swo
 *.sublime-project
 *.sublime-workspace
+docs/demo-walkthrough.md

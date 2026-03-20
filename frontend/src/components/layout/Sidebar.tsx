@@ -21,7 +21,7 @@ export function Sidebar() {
             <Zap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white leading-tight">McLane</p>
+            <p className="text-sm font-bold text-white leading-tight">ABC</p>
             <p className="text-xs text-gray-400 leading-tight">NegoAgent</p>
           </div>
         </div>

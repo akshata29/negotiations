@@ -7,6 +7,7 @@ import { Vendors } from './pages/Vendors'
 import { Negotiations } from './pages/Negotiations'
 import { NegotiationDetail } from './pages/NegotiationDetail'
 import { ABTesting } from './pages/ABTesting'
+import { Workflow } from './pages/Workflow'
 import { Architecture } from './pages/Architecture'
 import { Settings } from './pages/Settings'
 import { useLocation } from 'react-router-dom'
@@ -16,7 +17,8 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/vendors': { title: 'Vendors', subtitle: 'Manage and filter vendor list' },
   '/negotiations': { title: 'Negotiations', subtitle: 'Track active negotiations' },
   '/ab-testing': { title: 'A/B Testing & RL', subtitle: 'UCB1 multi-armed bandit strategy selection' },
-  '/architecture': { title: 'Architecture', subtitle: 'End-to-end system design & component details' },
+  '/workflow': { title: 'Workflow', subtitle: 'End-to-end negotiation workflow — click any component to see rich details' },
+  '/architecture': { title: 'Architecture', subtitle: 'End-to-end system architecture — Azure services, data flows & design decisions' },
   '/settings': { title: 'Settings', subtitle: 'Model, system prompts & agent personality' },
 }
 
@@ -46,6 +48,7 @@ export default function App() {
             <Route path="/negotiations" element={<Negotiations />} />
             <Route path="/negotiations/:id" element={<NegotiationDetail />} />
             <Route path="/ab-testing" element={<ABTesting />} />
+            <Route path="/workflow" element={<Workflow />} />
             <Route path="/architecture" element={<Architecture />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

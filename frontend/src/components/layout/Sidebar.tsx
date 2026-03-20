@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, MessageSquare, BarChart3, Network, Zap, Settings
+  LayoutDashboard, Users, MessageSquare, BarChart3, Network, GitBranch, Zap, Settings
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -9,6 +9,7 @@ const nav = [
   { to: '/vendors', icon: Users, label: 'Vendors' },
   { to: '/negotiations', icon: MessageSquare, label: 'Negotiations' },
   { to: '/ab-testing', icon: BarChart3, label: 'A/B Testing & RL' },
+  { to: '/workflow', icon: GitBranch, label: 'Workflow' },
   { to: '/architecture', icon: Network, label: 'Architecture' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

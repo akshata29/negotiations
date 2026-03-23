@@ -254,9 +254,17 @@ async def _handle_contact_reply(neg: NegotiationInDB, analysis: dict) -> Negotia
     elif status in ("rejected", "redirected"):
         neg.stage = NegotiationStage.ESCALATED
         neg.outcome = "wrong_contact"
+        vendor = await db.get_vendor(neg.vendor_id)
+        if vendor:
+            vendor["negotiation_status"] = NegotiationStatus.COMPLETED
+            await db.upsert_vendor(vendor)
     else:
         neg.stage = NegotiationStage.ESCALATED
         neg.outcome = "unclear_contact"
+        vendor = await db.get_vendor(neg.vendor_id)
+        if vendor:
+            vendor["negotiation_status"] = NegotiationStatus.COMPLETED
+            await db.upsert_vendor(vendor)
     neg.updated_at = datetime.utcnow().isoformat()
     await db.upsert_negotiation({**neg.model_dump(), "vendor_id": str(neg.vendor_id)})
     return neg
@@ -378,6 +386,10 @@ async def _handle_proposal_reply(neg: NegotiationInDB, analysis: dict, vendor_bo
         neg.stage = NegotiationStage.ESCALATED
         neg.outcome = "escalated"
         await rl.record_outcome(neg.ab_group, 0.2)  # partial credit for reaching escalation
+        vendor = await db.get_vendor(neg.vendor_id)
+        if vendor:
+            vendor["negotiation_status"] = NegotiationStatus.COMPLETED
+            await db.upsert_vendor(vendor)
 
     neg.updated_at = datetime.utcnow().isoformat()
     await db.upsert_negotiation({**neg.model_dump(), "vendor_id": str(neg.vendor_id)})
@@ -394,5 +406,9 @@ async def escalate_negotiation(negotiation_id: str, notes: str = "") -> Negotiat
     neg.human_notes = notes
     neg.updated_at = datetime.utcnow().isoformat()
     await db.upsert_negotiation({**neg.model_dump(), "vendor_id": str(neg.vendor_id)})
+    vendor = await db.get_vendor(neg.vendor_id)
+    if vendor:
+        vendor["negotiation_status"] = NegotiationStatus.COMPLETED
+        await db.upsert_vendor(vendor)
     await _broadcast_event("negotiation_escalated", {"negotiation_id": neg.id})
     return neg

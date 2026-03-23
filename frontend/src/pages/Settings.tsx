@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import {
   Bot, Cpu, Wand2, RefreshCw, Check, AlertCircle, Save,
   ChevronDown, ChevronUp, Users, Shield, Zap, Heart, BarChart2,
-  Info, FlaskConical,
+  Info, FlaskConical, SlidersHorizontal, Lock, Unlock,
 } from 'lucide-react'
 import {
   getAgentSettings,
@@ -15,7 +15,7 @@ import {
   getDefaultSettings,
   getPersonaInfo,
 } from '../services/api'
-import type { AgentSettings, PersonalityPreset } from '../types'
+import type { AgentSettings, PersonalityPreset, SimulationApprovalGates } from '../types'
 
 // ── Personality icon map ──────────────────────────────────────────────────────
 
@@ -58,6 +58,220 @@ function Alert({ type, message, onClose }: { type: 'success' | 'error'; message:
       {type === 'success' ? <Check className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
       <span className="flex-1">{message}</span>
       <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100">✕</button>
+    </div>
+  )
+}
+
+// ── Simulation approval gates helpers/component ──────────────────────────────
+
+function defaultGates(): SimulationApprovalGates {
+  return {
+    fully_automated: false,
+    contact_draft: true,
+    proposal_draft: true,
+    counter_draft: true,
+    contact_reply: false,
+    proposal_reply: false,
+    counter_reply: false,
+  }
+}
+
+interface GateToggleProps {
+  label: string
+  description: string
+  checked: boolean
+  disabled?: boolean
+  onChange: (v: boolean) => void
+}
+function GateToggle({ label, description, checked, disabled, onChange }: GateToggleProps) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={clsx(
+        'flex items-start gap-3 w-full text-left rounded-xl border p-3.5 transition-all',
+        disabled
+          ? 'opacity-40 cursor-not-allowed border-gray-700 bg-gray-900/20'
+          : checked
+            ? 'border-amber-600/70 bg-amber-900/20 hover:bg-amber-900/30'
+            : 'border-gray-700 bg-gray-900/30 hover:border-gray-600',
+      )}
+    >
+      <div
+        className={clsx(
+          'mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center transition-colors border',
+          checked && !disabled ? 'bg-amber-600 border-amber-500' : 'border-gray-600 bg-gray-800',
+        )}
+      >
+        {checked && !disabled && <Check className="w-2.5 h-2.5 text-white" />}
+      </div>
+      <div>
+        <p className={clsx('text-xs font-medium', checked && !disabled ? 'text-amber-200' : 'text-gray-300')}>
+          {label}
+        </p>
+        <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>
+      </div>
+    </button>
+  )
+}
+
+interface SimApprovalGatesSectionProps {
+  gates: SimulationApprovalGates
+  onChange: (g: SimulationApprovalGates) => void
+}
+function SimApprovalGatesSection({ gates, onChange }: SimApprovalGatesSectionProps) {
+  const set = (key: keyof SimulationApprovalGates, value: boolean) =>
+    onChange({ ...gates, [key]: value })
+
+  const allDraftGatesOn =
+    !gates.fully_automated &&
+    gates.contact_draft &&
+    gates.proposal_draft &&
+    gates.counter_draft
+
+  return (
+    <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-amber-600/20 flex items-center justify-center">
+          <SlidersHorizontal className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-white">Simulation Approval Gates</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Control which workflow stages pause for human review during a vendor simulation run
+          </p>
+        </div>
+      </div>
+
+      {/* Master automation switch */}
+      <div
+        className={clsx(
+          'flex items-center justify-between rounded-xl border px-4 py-3.5 cursor-pointer transition-all',
+          gates.fully_automated
+            ? 'border-emerald-600/70 bg-emerald-900/20'
+            : 'border-amber-600/70 bg-amber-900/10',
+        )}
+        onClick={() => set('fully_automated', !gates.fully_automated)}
+      >
+        <div className="flex items-center gap-3">
+          {gates.fully_automated
+            ? <Unlock className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            : <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />}
+          <div>
+            <p className={clsx('text-sm font-semibold', gates.fully_automated ? 'text-emerald-300' : 'text-amber-200')}>
+              {gates.fully_automated ? 'Fully Automated' : 'Human-in-the-Loop (HITL) Active'}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {gates.fully_automated
+                ? 'Simulation runs end-to-end without pausing — all gates bypassed'
+                : 'Simulation pauses at enabled gates below and waits for manual review'}
+            </p>
+          </div>
+        </div>
+        {/* Visual toggle pill */}
+        <div
+          className={clsx(
+            'relative w-11 h-6 rounded-full border transition-colors flex-shrink-0',
+            gates.fully_automated
+              ? 'bg-emerald-600 border-emerald-500'
+              : 'bg-gray-700 border-gray-600',
+          )}
+        >
+          <span
+            className={clsx(
+              'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+              gates.fully_automated ? 'left-5' : 'left-0.5',
+            )}
+          />
+        </div>
+      </div>
+
+      {/* Status callout */}
+      {!gates.fully_automated && allDraftGatesOn && (
+        <div className="flex items-start gap-2 bg-amber-900/10 border border-amber-800/40 rounded-lg px-3 py-2.5">
+          <Info className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300/80 leading-relaxed">
+            All email draft gates are active — the simulation will pause at each
+            AI-drafted email and wait for your approval before continuing. This is the
+            recommended default for realistic, auditable runs.
+          </p>
+        </div>
+      )}
+      {gates.fully_automated && (
+        <div className="flex items-start gap-2 bg-emerald-900/10 border border-emerald-800/40 rounded-lg px-3 py-2.5">
+          <Info className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-emerald-300/80 leading-relaxed">
+            Fully automated mode is on — simulations will run to completion in one
+            shot without any human approval steps. Individual gate settings below are
+            ignored while this mode is active.
+          </p>
+        </div>
+      )}
+
+      {/* Per-gate toggles */}
+      <div className="space-y-4">
+        {/* Our AI-drafted email gates */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
+            Our Outbound Email Drafts
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <GateToggle
+              label="Contact Draft"
+              description="Review the AI-drafted contact-verification email before it is sent"
+              checked={gates.contact_draft}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('contact_draft', v)}
+            />
+            <GateToggle
+              label="Proposal Draft"
+              description="Review the AI-drafted proposal email before it is sent"
+              checked={gates.proposal_draft}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('proposal_draft', v)}
+            />
+            <GateToggle
+              label="Counter-Offer Draft"
+              description="Review the AI-drafted counter-offer email before it is sent"
+              checked={gates.counter_draft}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('counter_draft', v)}
+            />
+          </div>
+        </div>
+
+        {/* Vendor reply injection gates */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
+            Simulated Vendor Replies
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <GateToggle
+              label="Contact Reply"
+              description="Preview the simulated vendor contact reply before it is injected"
+              checked={gates.contact_reply}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('contact_reply', v)}
+            />
+            <GateToggle
+              label="Proposal Reply"
+              description="Preview the simulated vendor proposal reply before it is injected"
+              checked={gates.proposal_reply}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('proposal_reply', v)}
+            />
+            <GateToggle
+              label="Counter Reply"
+              description="Preview the simulated vendor final reply before it is injected"
+              checked={gates.counter_reply}
+              disabled={gates.fully_automated}
+              onChange={(v) => set('counter_reply', v)}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -412,6 +626,12 @@ export function Settings() {
           </p>
         </div>
       )}
+
+      {/* ── Section 5: Simulation Approval Gates ───────────────────────── */}
+      <SimApprovalGatesSection
+        gates={activeDraft.simulation_approval_gates ?? defaultGates()}
+        onChange={(g) => setDraft((d) => d ? { ...d, simulation_approval_gates: g } : null)}
+      />
 
       {/* ── Action Bar ───────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between bg-gray-800/60 rounded-xl border border-gray-700 px-5 py-4">

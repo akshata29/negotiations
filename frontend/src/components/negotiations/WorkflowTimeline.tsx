@@ -7,6 +7,7 @@ const STAGES: { key: NegotiationStage; label: string }[] = [
   { key: 'contact_confirmed', label: 'Confirmed' },
   { key: 'proposal_approval', label: 'Proposal Draft' },
   { key: 'proposal_sent', label: 'Proposal Sent' },
+  { key: 'counter_approval', label: 'Counter' },
   { key: 'agreed', label: 'Agreed' },
 ]
 

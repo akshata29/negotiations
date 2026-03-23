@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getNegotiation, getSimulationScenarios, simulateNegotiation } from '../services/api'
+import { getNegotiation, getSimulationScenarios, simulateNegotiation, resumeSimulation } from '../services/api'
 import { EmailThread } from '../components/negotiations/EmailThread'
 import { WorkflowTimeline } from '../components/negotiations/WorkflowTimeline'
 import { ApprovalModal } from '../components/negotiations/ApprovalModal'
 import { StatusBadge } from '../components/common/StatusBadge'
-import { ArrowLeft, Clock, FlaskConical, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Clock, FlaskConical, ChevronRight, CheckCircle2, XCircle, Loader2, PauseCircle, PlayCircle, Info } from 'lucide-react'
 import type { EmailMessage } from '../types'
 
 const ACTIONABLE_STAGES = new Set([
@@ -32,7 +32,17 @@ export function NegotiationDetail() {
   const qc = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [showSimulate, setShowSimulate] = useState(false)
-  const [simResult, setSimResult] = useState<null | { final_stage: string; scenario_label: string; rounds: number; log: Array<{ action: string; detail: string; stage?: string }> }>(null)
+  const [simResult, setSimResult] = useState<null | {
+    status: string
+    final_stage?: string
+    scenario_label: string
+    rounds?: number
+    log: Array<{ action: string; detail: string; stage?: string }>
+    // pause fields
+    paused_at?: string
+    paused_at_stage?: string
+    message?: string
+  }>(null)
 
   const { data: neg, isLoading } = useQuery({
     queryKey: ['negotiation', id],
@@ -50,7 +60,35 @@ export function NegotiationDetail() {
   const simMut = useMutation({
     mutationFn: (scenario: string) => simulateNegotiation(id!, scenario),
     onSuccess: (data) => {
-      setSimResult({ final_stage: data.final_stage, scenario_label: data.scenario_label, rounds: data.rounds, log: data.log })
+      setSimResult({
+        status: data.status,
+        final_stage: data.final_stage,
+        scenario_label: data.scenario_label,
+        rounds: data.rounds,
+        log: data.log,
+        paused_at: data.paused_at,
+        paused_at_stage: data.paused_at_stage,
+        message: data.message,
+      })
+      qc.invalidateQueries({ queryKey: ['negotiation', id] })
+      qc.invalidateQueries({ queryKey: ['negotiations'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+
+  const resumeMut = useMutation({
+    mutationFn: () => resumeSimulation(id!),
+    onSuccess: (data) => {
+      setSimResult({
+        status: data.status,
+        final_stage: data.final_stage,
+        scenario_label: data.scenario_label,
+        rounds: data.rounds,
+        log: data.log,
+        paused_at: data.paused_at,
+        paused_at_stage: data.paused_at_stage,
+        message: data.message,
+      })
       qc.invalidateQueries({ queryKey: ['negotiation', id] })
       qc.invalidateQueries({ queryKey: ['negotiations'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
@@ -62,6 +100,7 @@ export function NegotiationDetail() {
 
   const emails = (neg.emails ?? []) as EmailMessage[]
   const canSimulate = ACTIONABLE_STAGES.has(neg.stage)
+  const isSimPaused = !!neg.active_simulation_scenario
   const scenarios = scenariosData?.scenarios ?? []
 
   const terminalStages = new Set(['agreed', 'rejected', 'escalated', 'completed'])
@@ -91,11 +130,16 @@ export function NegotiationDetail() {
             )}
             {(canSimulate || isTerminal === false) && !isTerminal && (
               <button
-                className="flex items-center gap-1.5 text-xs bg-purple-800/60 hover:bg-purple-700/60 border border-purple-600 text-purple-200 rounded-lg px-3 py-1.5 transition-colors"
+                className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors ${
+                  isSimPaused
+                    ? 'bg-amber-800/60 hover:bg-amber-700/60 border-amber-600 text-amber-200'
+                    : 'bg-purple-800/60 hover:bg-purple-700/60 border-purple-600 text-purple-200'
+                }`}
                 onClick={() => { setShowSimulate(s => !s); setSimResult(null) }}
               >
-                <FlaskConical className="w-3.5 h-3.5" />
-                Simulate Vendor
+                {isSimPaused
+                  ? <><PauseCircle className="w-3.5 h-3.5" /> Simulation Paused</>
+                  : <><FlaskConical className="w-3.5 h-3.5" /> Simulate Vendor</>}
               </button>
             )}
           </div>
@@ -134,29 +178,66 @@ export function NegotiationDetail() {
         )}
       </div>
 
-      {/* ── Simulate Panel ─────────────────────────────────────────────── */}
       {showSimulate && !isTerminal && (
-        <div className="card space-y-4 border border-purple-800/60">
+        <div className={`card space-y-4 border ${isSimPaused ? 'border-amber-700/60' : 'border-purple-800/60'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FlaskConical className="w-4 h-4 text-purple-400" />
+              {isSimPaused
+                ? <PauseCircle className="w-4 h-4 text-amber-400" />
+                : <FlaskConical className="w-4 h-4 text-purple-400" />}
               <h3 className="text-sm font-semibold text-white">Simulate Vendor Response</h3>
             </div>
             <span className="text-xs text-gray-500">
-              {canSimulate
-                ? `Waiting for vendor at stage: ${neg.stage.replace(/_/g, ' ')}`
-                : 'Will auto-advance approval gates + inject vendor replies'}
+              {isSimPaused
+                ? `Paused at: ${neg.simulation_paused_at?.replace(/_/g, ' ')}`
+                : canSimulate
+                  ? `Waiting for vendor at stage: ${neg.stage.replace(/_/g, ' ')}`
+                  : 'Will auto-advance approval gates + inject vendor replies'}
             </span>
           </div>
 
+          {/* Paused-simulation banner */}
+          {isSimPaused && !simResult && (
+            <div className="flex items-start gap-3 bg-amber-900/20 border border-amber-700/50 rounded-xl px-4 py-3.5">
+              <PauseCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-medium text-amber-200">
+                  Simulation paused — waiting for your approval
+                </p>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  The <strong className="text-gray-300">{neg.active_simulation_scenario?.replace(/_/g, ' ')}</strong> scenario
+                  has reached a Human-in-the-Loop gate at stage{' '}
+                  <strong className="text-gray-300">{neg.simulation_paused_at?.replace(/_/g, ' ')}</strong>.
+                  Review and approve the pending email using the <em>Review Email</em> button above,
+                  then click <strong className="text-amber-200">Continue Simulation</strong> to proceed.
+                </p>
+                <button
+                  onClick={() => resumeMut.mutate()}
+                  disabled={resumeMut.isPending || !!neg.pending_approval_email_id}
+                  className="flex items-center gap-2 mt-1 px-4 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold text-white transition-colors"
+                >
+                  {resumeMut.isPending
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Resuming…</>
+                    : <><PlayCircle className="w-4 h-4" /> Continue Simulation</>}
+                </button>
+                {neg.pending_approval_email_id && (
+                  <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    Approve the pending email draft first, then click Continue Simulation.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-gray-400">
-            Choose a scenario — the simulation will inject realistic vendor email replies,
-            auto-approve any pending drafts, and run the full workflow to completion so you can see
-            the UI update in real time.
+            {isSimPaused
+              ? 'Choose a new scenario to restart, or continue the paused scenario above.'
+              : 'Choose a scenario — the simulation will inject realistic vendor email replies, auto-approve any pending drafts (unless Human-in-the-Loop gates are enabled), and run the workflow forward so you can see the UI update in real time.'}
           </p>
 
-          {/* Scenario cards */}
-          {simMut.isPending ? (
+          {/* Scenario cards / loading / result */}
+          {(simMut.isPending || resumeMut.isPending) ? (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
               <p className="text-sm text-gray-300">Running simulation…</p>
@@ -164,21 +245,53 @@ export function NegotiationDetail() {
             </div>
           ) : simResult ? (
             <div className="space-y-3">
-              <div className={`flex items-center gap-2 rounded-lg px-4 py-3 ${simResult.final_stage === 'agreed' ? 'bg-green-900/30 border border-green-700' : simResult.final_stage === 'rejected' ? 'bg-red-900/20 border border-red-800' : 'bg-orange-900/20 border border-orange-800'}`}>
-                {simResult.final_stage === 'agreed'
-                  ? <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  : <XCircle className="w-5 h-5 text-red-400" />}
-                <div>
-                  <p className="text-sm font-semibold text-white">{simResult.scenario_label} — {simResult.final_stage.replace(/_/g, ' ').toUpperCase()}</p>
-                  <p className="text-xs text-gray-400">{simResult.rounds} negotiation round{simResult.rounds !== 1 ? 's' : ''}</p>
+              {/* Paused result */}
+              {simResult.status === 'paused_for_approval' ? (
+                <div className="flex items-start gap-3 bg-amber-900/20 border border-amber-700 rounded-lg px-4 py-3">
+                  <PauseCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {simResult.scenario_label} — Paused for Approval
+                    </p>
+                    <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">{simResult.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Gate: <span className="text-amber-400">{simResult.paused_at?.replace(/_/g, ' ')}</span>
+                    </p>
+                    <button
+                      onClick={() => resumeMut.mutate()}
+                      disabled={resumeMut.isPending || !!neg.pending_approval_email_id}
+                      className="flex items-center gap-2 mt-3 px-4 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold text-white transition-colors"
+                    >
+                      {resumeMut.isPending
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Resuming…</>
+                        : <><PlayCircle className="w-3.5 h-3.5" /> Continue Simulation</>}
+                    </button>
+                    {neg.pending_approval_email_id && (
+                      <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-2">
+                        <Info className="w-3.5 h-3.5" />
+                        Click <strong>Review Email</strong> above to approve the draft first.
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Completed result */
+                <div className={`flex items-center gap-2 rounded-lg px-4 py-3 ${simResult.final_stage === 'agreed' ? 'bg-green-900/30 border border-green-700' : simResult.final_stage === 'rejected' ? 'bg-red-900/20 border border-red-800' : 'bg-orange-900/20 border border-orange-800'}`}>
+                  {simResult.final_stage === 'agreed'
+                    ? <CheckCircle2 className="w-5 h-5 text-green-400" />
+                    : <XCircle className="w-5 h-5 text-red-400" />}
+                  <div>
+                    <p className="text-sm font-semibold text-white">{simResult.scenario_label} — {simResult.final_stage?.replace(/_/g, ' ').toUpperCase()}</p>
+                    <p className="text-xs text-gray-400">{simResult.rounds} negotiation round{simResult.rounds !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Execution log */}
               <div className="space-y-1.5">
                 {simResult.log.map((entry, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs">
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" />
+                    <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${entry.action === 'paused' ? 'bg-amber-400' : 'bg-purple-500'}`} />
                     <div>
                       <span className="text-gray-300">{entry.detail}</span>
                       {entry.stage && <span className="text-purple-400 ml-1.5">→ {entry.stage.replace(/_/g, ' ')}</span>}
@@ -218,7 +331,7 @@ export function NegotiationDetail() {
             </div>
           )}
 
-          {simMut.isError && (
+          {(simMut.isError || resumeMut.isError) && (
             <p className="text-xs text-red-400">Simulation failed — check backend logs.</p>
           )}
         </div>

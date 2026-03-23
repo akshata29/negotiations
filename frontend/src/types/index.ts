@@ -68,6 +68,10 @@ export interface Negotiation {
   rounds: number
   outcome: string | null
   improvement_score: number
+  /** Set while a step-wise simulation is in progress */
+  active_simulation_scenario: string | null
+  /** Gate key where the simulation is currently paused */
+  simulation_paused_at: string | null
   created_at: string
   updated_at: string
   emails?: EmailMessage[]
@@ -172,12 +176,30 @@ export interface WSEvent {
 
 // ── Agent Settings ───────────────────────────────────────────────────────────────
 
+export interface SimulationApprovalGates {
+  /** If true all gates are bypassed — fully automated mode */
+  fully_automated: boolean
+  /** Pause before contact email draft is “sent” */
+  contact_draft: boolean
+  /** Pause before proposal email draft is “sent” */
+  proposal_draft: boolean
+  /** Pause before counter-offer email draft is “sent” */
+  counter_draft: boolean
+  /** Pause before injecting simulated vendor contact reply */
+  contact_reply: boolean
+  /** Pause before injecting simulated vendor proposal reply */
+  proposal_reply: boolean
+  /** Pause before injecting simulated vendor counter reply */
+  counter_reply: boolean
+}
+
 export interface AgentSettings {
   id: string
   model_deployment_name: string
   email_system_prompt: string
   analyzer_system_prompt: string
   personality: string
+  simulation_approval_gates: SimulationApprovalGates
   updated_at: string
 }
 

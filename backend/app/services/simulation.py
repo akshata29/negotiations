@@ -1,15 +1,20 @@
 """
 Simulation service — drives a negotiation through a scripted scenario end-to-end.
 
-Each scenario provides realistic vendor reply bodies that will be correctly
-classified by the AI response_analyzer, then feeds them through the real
-orchestrator pipeline (auto-approving any human-in-the-loop gates).
+When simulation_approval_gates (from AgentSettings) has fully_automated=False the
+runner PAUSES at each configured gate and returns status="paused_for_approval" so
+the human can review the AI-drafted email (or the upcoming vendor reply) in the UI
+before the simulation continues.
+
+Resume by calling run_simulation(negotiation_id, scenario=None) — the active scenario
+and pause point are stored on the negotiation document.
 """
 from __future__ import annotations
 import logging
 from typing import Any
 
 from app.models.negotiation import NegotiationInDB, NegotiationStage
+from app.models.agent_settings import SimulationApprovalGates
 from app.services.cosmos import CosmosService
 from app.agents import orchestrator
 
@@ -115,25 +120,66 @@ SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────
+
+async def _get_approval_gates() -> SimulationApprovalGates:
+    """Load approval-gate config from stored agent settings (falls back to defaults)."""
+    try:
+        db = CosmosService.get()
+        stored = await db.get_agent_settings()
+        if stored and "simulation_approval_gates" in stored:
+            g = stored["simulation_approval_gates"]
+            return SimulationApprovalGates(**g) if isinstance(g, dict) else SimulationApprovalGates()
+    except Exception:
+        pass
+    return SimulationApprovalGates()
+
+
+def _gate_active(gates: SimulationApprovalGates, key: str) -> bool:
+    """Return True when a specific gate should pause the simulation."""
+    if gates.fully_automated:
+        return False
+    return bool(getattr(gates, key, False))
+
+
 # ── Simulation runner ─────────────────────────────────────────────────────
 
-async def run_simulation(negotiation_id: str, scenario: str) -> dict:
-    """
-    Drive a negotiation through a scripted scenario end-to-end.
+PAUSE_STATUS = "paused_for_approval"
+DONE_STATUS = "completed"
 
-    Auto-approves all human-in-the-loop email drafts so the full workflow
-    completes without manual intervention. Returns the final negotiation state,
-    full email thread, and a human-readable execution log.
+
+async def run_simulation(negotiation_id: str, scenario: str | None) -> dict:
     """
-    if scenario not in SCENARIOS:
+    Drive a negotiation through a scripted scenario, respecting approval gates.
+
+    Pass ``scenario`` the first time.  On subsequent calls (after the human has
+    approved the pending email) pass ``scenario=None`` — the active scenario is
+    re-read from the negotiation document.
+
+    Returns a dict with ``status`` of either ``"paused_for_approval"`` or
+    ``"completed"``.  When paused, ``paused_at`` tells the UI which gate is
+    waiting and ``message`` provides a human-readable description.
+    """
+    db = CosmosService.get()
+    gates = await _get_approval_gates()
+
+    # ── Resolve scenario ──────────────────────────────────────────────────
+    neg_doc = await db.get_negotiation(negotiation_id)
+    if not neg_doc:
+        raise ValueError(f"Negotiation {negotiation_id} not found")
+
+    if scenario is None:
+        scenario = neg_doc.get("active_simulation_scenario")
+        if not scenario:
+            raise ValueError("No active simulation to resume on this negotiation")
+    elif scenario not in SCENARIOS:
         raise ValueError(f"Unknown scenario '{scenario}'. Valid: {list(SCENARIOS)}")
 
     s = SCENARIOS[scenario]
-    db = CosmosService.get()
     log_entries: list[dict] = []
 
     def _step(action: str, detail: str, stage: str = ""):
-        entry = {"action": action, "detail": detail}
+        entry: dict = {"action": action, "detail": detail}
         if stage:
             entry["stage"] = stage
         log_entries.append(entry)
@@ -145,6 +191,30 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
             raise ValueError(f"Negotiation {negotiation_id} disappeared")
         return NegotiationInDB(**{k: v for k, v in data.items() if not k.startswith("_")})
 
+    async def _pause(gate_key: str, stage: str, message: str) -> dict:
+        """Persist pause state and return a pause response."""
+        doc = await db.get_negotiation(negotiation_id)
+        doc["active_simulation_scenario"] = scenario
+        doc["simulation_paused_at"] = gate_key
+        await db.upsert_negotiation(doc)
+        _step("paused", message, stage)
+        return {
+            "status": PAUSE_STATUS,
+            "paused_at": gate_key,
+            "paused_at_stage": stage,
+            "message": message,
+            "scenario": scenario,
+            "scenario_label": s["label"],
+            "log": log_entries,
+        }
+
+    async def _clear_sim_state():
+        """Remove simulation bookmark from the negotiation doc."""
+        doc = await db.get_negotiation(negotiation_id)
+        doc.pop("active_simulation_scenario", None)
+        doc.pop("simulation_paused_at", None)
+        await db.upsert_negotiation(doc)
+
     neg = await _refresh()
     _step("start", f"Beginning scenario '{s['label']}'", neg.stage)
 
@@ -154,14 +224,27 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
         neg = await orchestrator.advance_to_contact_draft(neg, vendor_email)
         _step("contact_draft", "Contact email drafted by AI agent", neg.stage)
 
-    # ── Phase 1: auto-approve if stuck at contact approval ────────────────
+    # ── Phase 1: contact approval gate ───────────────────────────────────
     if neg.stage == NegotiationStage.CONTACT_APPROVAL:
+        if _gate_active(gates, "contact_draft"):
+            return await _pause(
+                "contact_draft",
+                neg.stage,
+                "Contact email draft is awaiting your review and approval before it is sent to the vendor.",
+            )
         await orchestrator.approve_email(negotiation_id, approved_by="Simulation")
         neg = await _refresh()
-        _step("auto_approve", "Contact draft auto-approved", neg.stage)
+        _step("auto_approve", "Contact draft auto-approved (gate disabled)", neg.stage)
 
-    # ── Phase 2: inject contact reply ────────────────────────────────────
+    # ── Phase 2: contact-reply gate then inject reply ─────────────────────
     if neg.stage == NegotiationStage.CONTACT_SENT:
+        if _gate_active(gates, "contact_reply"):
+            reply_preview = s["contact_reply"][:120] + "…"
+            return await _pause(
+                "contact_reply",
+                neg.stage,
+                f"Ready to inject simulated vendor contact reply. Preview: \"{reply_preview}\"",
+            )
         result = await orchestrator.submit_vendor_reply(
             negotiation_id, s["contact_reply"], sender_name=neg.vendor_long_name
         )
@@ -173,14 +256,27 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
             neg.stage,
         )
 
-    # ── Phase 3: auto-approve proposal draft ──────────────────────────────
+    # ── Phase 3: proposal approval gate ──────────────────────────────────
     if neg.stage == NegotiationStage.PROPOSAL_APPROVAL:
+        if _gate_active(gates, "proposal_draft"):
+            return await _pause(
+                "proposal_draft",
+                neg.stage,
+                "Proposal email draft is awaiting your review and approval before it is sent to the vendor.",
+            )
         await orchestrator.approve_email(negotiation_id, approved_by="Simulation")
         neg = await _refresh()
-        _step("auto_approve", "Proposal draft auto-approved", neg.stage)
+        _step("auto_approve", "Proposal draft auto-approved (gate disabled)", neg.stage)
 
-    # ── Phase 4: inject proposal reply (if scenario has one) ──────────────
+    # ── Phase 4: proposal-reply gate then inject reply ────────────────────
     if neg.stage == NegotiationStage.PROPOSAL_SENT and "proposal_reply" in s:
+        if _gate_active(gates, "proposal_reply"):
+            reply_preview = s["proposal_reply"][:120] + "…"
+            return await _pause(
+                "proposal_reply",
+                neg.stage,
+                f"Ready to inject simulated vendor proposal reply. Preview: \"{reply_preview}\"",
+            )
         result = await orchestrator.submit_vendor_reply(
             negotiation_id, s["proposal_reply"], sender_name=neg.vendor_long_name
         )
@@ -192,14 +288,27 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
             neg.stage,
         )
 
-    # ── Phase 5: auto-approve counter draft ───────────────────────────────
+    # ── Phase 5: counter approval gate ───────────────────────────────────
     if neg.stage == NegotiationStage.COUNTER_APPROVAL:
+        if _gate_active(gates, "counter_draft"):
+            return await _pause(
+                "counter_draft",
+                neg.stage,
+                "Counter-offer email draft is awaiting your review and approval before it is sent to the vendor.",
+            )
         await orchestrator.approve_email(negotiation_id, approved_by="Simulation")
         neg = await _refresh()
-        _step("auto_approve", "Counter draft auto-approved", neg.stage)
+        _step("auto_approve", "Counter draft auto-approved (gate disabled)", neg.stage)
 
-    # ── Phase 6: inject counter reply (if scenario has one) ───────────────
+    # ── Phase 6: counter-reply gate then inject reply ─────────────────────
     if neg.stage == NegotiationStage.COUNTER_SENT and "counter_reply" in s:
+        if _gate_active(gates, "counter_reply"):
+            reply_preview = s["counter_reply"][:120] + "…"
+            return await _pause(
+                "counter_reply",
+                neg.stage,
+                f"Ready to inject simulated vendor counter reply. Preview: \"{reply_preview}\"",
+            )
         result = await orchestrator.submit_vendor_reply(
             negotiation_id, s["counter_reply"], sender_name=neg.vendor_long_name
         )
@@ -212,6 +321,7 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
         )
 
     # ── Collect final state ───────────────────────────────────────────────
+    await _clear_sim_state()
     final_neg = await db.get_negotiation(negotiation_id)
     emails = await db.list_emails(negotiation_id)
     final_stage = final_neg.get("stage", "unknown")
@@ -219,6 +329,7 @@ async def run_simulation(negotiation_id: str, scenario: str) -> dict:
     _step("complete", f"Simulation finished at stage: {final_stage}", final_stage)
 
     return {
+        "status": DONE_STATUS,
         "scenario": scenario,
         "scenario_label": s["label"],
         "final_stage": final_stage,

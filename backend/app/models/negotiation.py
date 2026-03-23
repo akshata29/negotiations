@@ -80,6 +80,10 @@ class NegotiationInDB(BaseModel):
     outcome: Optional[str] = None       # "accepted" | "rejected" | "counter_accepted" | "escalated"
     improvement_score: float = 0.0      # 0-1, used for RL reward
 
+    # Active simulation tracking (set while a step-wise simulation is running)
+    active_simulation_scenario: Optional[str] = None   # scenario id if simulation is paused
+    simulation_paused_at: Optional[str] = None          # stage where simulation is waiting
+
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 

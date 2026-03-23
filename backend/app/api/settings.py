@@ -26,12 +26,17 @@ async def _get_or_defaults() -> dict:
     db = CosmosService.get()
     stored = await db.get_agent_settings()
     if stored:
+        # Back-fill simulation_approval_gates for documents saved before this field existed
+        if "simulation_approval_gates" not in stored:
+            from app.models.agent_settings import SimulationApprovalGates
+            stored["simulation_approval_gates"] = SimulationApprovalGates().model_dump()
         return stored
 
     # Build defaults from env + collaborative personality
     env = get_env_settings()
     from app.agents.email_composer import PERSONA, EMAIL_OUTPUT_RULES
     from app.agents.response_analyzer import ANALYZER_SYSTEM
+    from app.models.agent_settings import SimulationApprovalGates
 
     return {
         "id": "global",
@@ -39,6 +44,7 @@ async def _get_or_defaults() -> dict:
         "email_system_prompt": PERSONA + "\n\n" + EMAIL_OUTPUT_RULES,
         "analyzer_system_prompt": ANALYZER_SYSTEM,
         "personality": "collaborative",
+        "simulation_approval_gates": SimulationApprovalGates().model_dump(),
         "updated_at": "",
     }
 

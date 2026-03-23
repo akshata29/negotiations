@@ -144,15 +144,37 @@ export async function getSimulationScenarios() {
 
 export async function simulateNegotiation(negotiationId: string, scenario: string) {
   const res = await api.post<{
+    status: string
     scenario: string
     scenario_label: string
-    final_stage: string
-    rounds: number
-    agreed_terms: Record<string, number | null> | null
+    final_stage?: string
+    rounds?: number
+    agreed_terms?: Record<string, number | null> | null
     log: Array<{ action: string; detail: string; stage?: string }>
-    negotiation: Record<string, unknown>
-    emails: unknown[]
+    negotiation?: Record<string, unknown>
+    emails?: unknown[]
+    paused_at?: string
+    paused_at_stage?: string
+    message?: string
   }>(`/negotiations/${negotiationId}/simulate`, null, { params: { scenario } })
+  return res.data
+}
+
+export async function resumeSimulation(negotiationId: string) {
+  const res = await api.post<{
+    status: string
+    scenario: string
+    scenario_label: string
+    final_stage?: string
+    rounds?: number
+    agreed_terms?: Record<string, number | null> | null
+    log: Array<{ action: string; detail: string; stage?: string }>
+    negotiation?: Record<string, unknown>
+    emails?: unknown[]
+    paused_at?: string
+    paused_at_stage?: string
+    message?: string
+  }>(`/negotiations/${negotiationId}/simulate/resume`)
   return res.data
 }
 

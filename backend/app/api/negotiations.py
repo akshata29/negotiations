@@ -102,11 +102,29 @@ async def get_scenarios():
 @router.post("/{negotiation_id}/simulate")
 async def simulate_negotiation(
     negotiation_id: str,
-    scenario: str = Query(..., description="Scenario ID: quick_win | friendly_counter | tough_negotiation | rejection | wrong_contact"),
+    scenario: str = Query(None, description="Scenario ID: quick_win | friendly_counter | tough_negotiation | rejection | wrong_contact — omit to resume a paused simulation"),
 ):
-    """Run a scripted end-to-end simulation scenario on a negotiation."""
+    """
+    Start or resume a simulation scenario.
+
+    • Pass ``scenario`` to start a new simulation.
+    • Omit ``scenario`` to resume a simulation that was paused at an approval gate.
+
+    Responds with ``status="paused_for_approval"`` when a gate is active, or
+    ``status="completed"`` when the simulation runs to its terminal stage.
+    """
     try:
         result = await run_simulation(negotiation_id, scenario)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{negotiation_id}/simulate/resume")
+async def resume_simulation(negotiation_id: str):
+    """Convenience alias for POST /simulate without a scenario (resume after approval)."""
+    try:
+        result = await run_simulation(negotiation_id, None)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

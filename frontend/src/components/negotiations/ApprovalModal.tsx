@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, Edit3, X, MessageSquare, AlertTriangle, Loader2 } from 'lucide-react'
+import { CheckCircle, Edit3, X, MessageSquare, AlertTriangle, Loader2, FlaskConical } from 'lucide-react'
 import { approveEmail, submitVendorReply, escalateNegotiation, getNegotiation } from '../../services/api'
 import { StatusBadge } from '../common/StatusBadge'
 import type { Negotiation } from '../../types'
@@ -65,6 +65,12 @@ export function ApprovalModal({ negotiation, onClose }: Props) {
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge type="stage" value={negotiation.stage} />
               {negotiation.ab_group && <StatusBadge type="group" value={negotiation.ab_group} />}
+              {negotiation.active_simulation_scenario && (
+                <span className="flex items-center gap-1 text-xs bg-amber-900/40 border border-amber-700/60 text-amber-300 rounded-full px-2 py-0.5">
+                  <FlaskConical className="w-3 h-3" />
+                  Simulation · {negotiation.active_simulation_scenario.replace(/_/g, ' ')}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -97,6 +103,17 @@ export function ApprovalModal({ negotiation, onClose }: Props) {
           {/* Approve tab */}
           {tab === 'approve' && (
             <div className="space-y-4">
+              {negotiation.active_simulation_scenario && (
+                <div className="flex items-start gap-2 bg-amber-900/20 border border-amber-700/50 rounded-lg px-3 py-2.5">
+                  <FlaskConical className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-300/80 leading-relaxed">
+                    This is a <strong className="text-amber-200">simulated workflow</strong>.
+                    Approving (and optionally editing) this draft will advance the{' '}
+                    <strong className="text-amber-200">{negotiation.active_simulation_scenario.replace(/_/g, ' ')}</strong>{' '}
+                    scenario. Click <em>Continue Simulation</em> in the detail panel after approval to proceed.
+                  </p>
+                </div>
+              )}
               {negLoading ? (
                 <div className="flex items-center justify-center gap-2 py-8 text-gray-400 text-sm">
                   <Loader2 className="w-4 h-4 animate-spin" />

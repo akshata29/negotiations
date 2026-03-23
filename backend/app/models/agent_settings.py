@@ -94,6 +94,26 @@ def build_email_system_prompt(
     return persona
 
 
+# ── Simulation approval-gate configuration ───────────────────────────────────
+
+class SimulationApprovalGates(BaseModel):
+    """Controls which workflow stages require human review during a simulation run."""
+    # Master switch: set to True to bypass ALL gates and run fully automated
+    fully_automated: bool = False
+
+    # Per-draft gates — pause before the AI-drafted email is "sent" and wait for
+    # a human to review / approve it in the UI (same ApprovalModal as live flow)
+    contact_draft: bool = True    # contact verification email
+    proposal_draft: bool = True   # initial proposal email
+    counter_draft: bool = True    # counter-offer email
+
+    # Per-reply gates — pause before injecting the simulated vendor reply so a
+    # human can see what the vendor is about to say before the pipeline continues
+    contact_reply: bool = False   # vendor reply to contact
+    proposal_reply: bool = False  # vendor reply to proposal
+    counter_reply: bool = False   # vendor final reply
+
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 class AgentSettings(BaseModel):
@@ -102,6 +122,7 @@ class AgentSettings(BaseModel):
     email_system_prompt: str = ""
     analyzer_system_prompt: str = ""
     personality: str = "collaborative"
+    simulation_approval_gates: SimulationApprovalGates = SimulationApprovalGates()
     updated_at: str = ""
 
 
@@ -110,3 +131,4 @@ class AgentSettingsUpdate(BaseModel):
     email_system_prompt: Optional[str] = None
     analyzer_system_prompt: Optional[str] = None
     personality: Optional[str] = None
+    simulation_approval_gates: Optional[SimulationApprovalGates] = None

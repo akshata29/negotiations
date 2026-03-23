@@ -203,7 +203,7 @@ const DETAILS: Record<string, ComponentDetail> = {
       'React Query refetchInterval: 20s for pending-approval bell badge',
       'useWebSocket: auto-reconnect every 3s, 30s ping/pong keepalive',
       'ApprovalModal: editable email body textarea with 3 tabs (Approve / Reply / Escalate)',
-      'WorkflowTimeline: renders all 18 stages with phase grouping and live active stage',
+      'WorkflowTimeline: renders 8 key milestones (Eligible → Counter → Agreed) with live active stage highlight',
       'NotificationBell: increments in real-time via WebSocket approval_needed events',
     ],
     tech: ['React 18', 'TypeScript', 'Vite', 'TanStack React Query', 'Tailwind CSS', 'Recharts', 'axios', 'react-router-dom'],

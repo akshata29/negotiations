@@ -243,8 +243,30 @@ const NODES: ArchNode[] = [
     },
   },
   {
+    id: 'vendor_reply', label: 'Vendor Reply', sublabel: 'gate  ·  simulation.py / orchestrator',
+    type: 'gate', cx: 500, cy: 888, w: 255, h: 64,
+    detail: {
+      badge: 'Human-in-the-Loop',
+      description: 'Represents the arrival of the vendor\'s reply. In a live workflow the orchestrator waits for an inbound email via POST /respond. In simulation mode this is a configurable pause gate — the runner stops here and lets a human confirm the scripted vendor reply before injecting it.',
+      files: [
+        'backend/app/agents/orchestrator.py → submit_vendor_reply()',
+        'backend/app/services/simulation.py → contact_reply / proposal_reply / counter_reply gates',
+        'frontend/src/pages/Settings.tsx → Simulation Approval Gates',
+      ],
+      responsibilities: [
+        'Live: inbound reply arrives via POST /api/negotiations/{id}/respond',
+        'Simulation: scripted reply injected at this checkpoint by simulation.py',
+        'Three configurable gates: contact_reply, proposal_reply, counter_reply (toggled in Settings)',
+        'When a gate is active the simulation returns status="paused_for_approval" here',
+        'Human confirms → simulation resumes and injects the vendor reply body',
+        'Inbound EmailThread stored with direction="inbound", status="received"',
+      ],
+      tech: ['FastAPI REST', 'SimulationApprovalGates', 'WebSocket broadcast', 'Cosmos DB'],
+    },
+  },
+  {
     id: 'resp_analyzer', label: 'Response Analyzer Agent', sublabel: 'agent  ·  Azure AI Foundry',
-    type: 'agent', cx: 500, cy: 883, w: 255, h: 72,
+    type: 'agent', cx: 500, cy: 993, w: 255, h: 72,
     detail: {
       badge: 'Foundry Agent',
       description: 'A GPT-4o powered agent that classifies the vendor\'s reply and extracts any counter-proposed terms. Determines the response intent so the orchestrator can route the negotiation to the correct next workflow stage.',
@@ -266,7 +288,7 @@ const NODES: ArchNode[] = [
   // ── Outcome nodes ──────────────────────────────────────────────────────────
   {
     id: 'agreed', label: 'Agreed', sublabel: 'stage: agreed',
-    type: 'outcome_success', cx: 150, cy: 985, w: 138, h: 60,
+    type: 'outcome_success', cx: 150, cy: 1095, w: 138, h: 60,
     detail: {
       badge: 'Outcome',
       description: 'The vendor accepted the proposed terms. Agreed terms are persisted, the negotiation is marked complete, and a full reward (plus first-round bonus) is awarded to the UCB1 bandit arm.',
@@ -282,7 +304,7 @@ const NODES: ArchNode[] = [
   },
   {
     id: 'counter', label: 'Counter Offer', sublabel: 'stage: counter_offer',
-    type: 'outcome_neutral', cx: 383, cy: 985, w: 145, h: 60,
+    type: 'outcome_neutral', cx: 383, cy: 1095, w: 145, h: 60,
     detail: {
       badge: 'Outcome',
       description: 'The vendor responded with alternative terms. Counter-terms are extracted and stored, the rounds counter is incremented, and the orchestrator loops back through email composition for a counter-proposal response.',
@@ -299,7 +321,7 @@ const NODES: ArchNode[] = [
   },
   {
     id: 'rejected', label: 'Rejected', sublabel: 'stage: rejected',
-    type: 'outcome_fail', cx: 617, cy: 985, w: 138, h: 60,
+    type: 'outcome_fail', cx: 617, cy: 1095, w: 138, h: 60,
     detail: {
       badge: 'Outcome',
       description: 'The vendor declined all proposed terms. Reward = 0.0, which decrements the Q-value for this UCB1 strategy arm, reducing its probability of future selection.',
@@ -307,7 +329,7 @@ const NODES: ArchNode[] = [
       responsibilities: [
         'outcome = "rejected"',
         'Reward = 0.0 → Q-value decremented via incremental mean update',
-        'negotiation_status updated to "rejected" on vendor record',
+        'negotiation_status updated to "completed" on vendor record',
         'Full email thread preserved for audit and manual analysis',
       ],
       tech: [],
@@ -315,7 +337,7 @@ const NODES: ArchNode[] = [
   },
   {
     id: 'escalated', label: 'Escalated', sublabel: 'stage: escalated',
-    type: 'outcome_warn', cx: 850, cy: 985, w: 145, h: 60,
+    type: 'outcome_warn', cx: 850, cy: 1095, w: 145, h: 60,
     detail: {
       badge: 'Outcome',
       description: 'The negotiation is flagged for human review — due to complex counter-terms, low analyzer confidence, max rounds exceeded, or a manual override. Partial reward is still computed.',
@@ -327,6 +349,7 @@ const NODES: ArchNode[] = [
         'Triggered by: max rounds exceeded, confidence < threshold, or manual POST /escalate',
         'outcome = "escalated"',
         'Partial reward computed based on any improvement achieved so far',
+        'negotiation_status updated to "completed" on vendor record',
         'Manual escalation endpoint available for human override at any stage',
         'Dashboard labels these negotiations with an Escalated badge',
       ],
@@ -336,7 +359,7 @@ const NODES: ArchNode[] = [
   // ── Post-outcome ──────────────────────────────────────────────────────────
   {
     id: 'reward', label: 'Reward Computation', sublabel: 'service  ·  rl.py → UCB1 update',
-    type: 'service', cx: 500, cy: 1095, w: 255, h: 64,
+    type: 'service', cx: 500, cy: 1205, w: 255, h: 64,
     detail: {
       badge: 'RL Update',
       description: 'Computes a scaled reward (0–1.5) based on the improvement achieved versus original vendor terms, then applies an incremental mean update to the UCB1 arm\'s Q-value — reinforcing strategies that produce better outcomes over time.',
@@ -355,7 +378,7 @@ const NODES: ArchNode[] = [
   },
   {
     id: 'end', label: '✅ Complete', type: 'end',
-    cx: 500, cy: 1193, w: 180, h: 36,
+    cx: 500, cy: 1303, w: 180, h: 36,
   },
 ]
 
@@ -394,7 +417,8 @@ function buildEdges(nodes: ArchNode[]): string[] {
     // Main spine
     straight(500, bottom(n.email_comp),      500, top(n.approval) - 2),
     straight(500, bottom(n.approval),        500, top(n.email_sent) - 2),
-    straight(500, bottom(n.email_sent),      500, top(n.resp_analyzer) - 2),
+    straight(500, bottom(n.email_sent),      500, top(n.vendor_reply) - 2),
+    straight(500, bottom(n.vendor_reply),    500, top(n.resp_analyzer) - 2),
     // Response analyzer fan-out to outcomes
     curve(500, bottom(n.resp_analyzer), n.agreed.cx,    top(n.agreed) - 2),
     curve(500, bottom(n.resp_analyzer), n.counter.cx,   top(n.counter) - 2),
@@ -435,7 +459,7 @@ export function Workflow() {
   }
 
   const SVG_W = 1000
-  const SVG_H = 1240
+  const SVG_H = 1350
 
   return (
     <div className="space-y-4">
@@ -458,6 +482,10 @@ export function Workflow() {
         <div className="flex items-center gap-1.5">
           <svg width="20" height="10"><line x1="0" y1="5" x2="16" y2="5" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,2" /></svg>
           <span className="text-gray-400">Counter-offer loop back</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className={`w-3 h-3 rounded-sm bg-amber-700 border border-amber-400`} />
+          <span className="text-gray-400">Sim Approval Gate</span>
         </div>
         <div className="ml-auto flex items-center gap-1.5 text-gray-500">
           <Info className="w-3.5 h-3.5" />
@@ -498,11 +526,11 @@ export function Workflow() {
               </text>
 
               <rect
-                x="68" y="944" width="864" height="78"
+                x="68" y="1054" width="864" height="78"
                 rx="10" fill="none"
                 stroke="#374151" strokeWidth="1" strokeDasharray="6,4"
               />
-              <text x="80" y="940" fill="#4b5563" fontSize="10" fontFamily="monospace">
+              <text x="80" y="1050" fill="#4b5563" fontSize="10" fontFamily="monospace">
                 Outcome Resolution
               </text>
 

@@ -85,3 +85,4 @@ data/
 *.sublime-project
 *.sublime-workspace
 docs/demo-walkthrough.md
+deploy.ps1

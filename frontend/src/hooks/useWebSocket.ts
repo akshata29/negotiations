@@ -17,7 +17,8 @@ export function useWebSocket({ onMessage, onConnect, onDisconnect }: Options) {
   onDisconnectRef.current = onDisconnect
 
   const connect = useCallback(() => {
-    const url = `ws://${window.location.host}/ws`
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const url = `${protocol}//${window.location.host}/ws`
     const socket = new WebSocket(url)
     ws.current = socket
 
